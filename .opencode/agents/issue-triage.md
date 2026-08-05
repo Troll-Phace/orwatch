@@ -25,6 +25,7 @@ permission:
     "gh label list*": allow
     "gh label create*": allow
     "gh api*": allow
+    "gh repo view*": allow
     "git log*": allow
     "git status*": allow
     "gh issue close*": deny
@@ -65,6 +66,20 @@ A good body answers four questions and nothing else: **what** is wrong, **where*
    ```
 3. Report a table: `# | title | type | severity | milestone`.
 4. Flag anything genuinely ambiguous for the user rather than guessing a severity. A wrongly-severitied issue is worse than an untriaged one because it stops getting looked at.
+
+## Resolving owner/repo
+
+`gh api repos/{owner}/{repo}/...` does **not** expand those placeholders — that
+substitution only happens for `gh issue` / `gh pr` style commands. Resolve it
+first:
+
+```bash
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+gh api "repos/$REPO/milestones"
+```
+
+There is also **no `gh milestone` command**. Milestones are created and listed
+through `gh api` only.
 
 ## When invoked to REVIEW a milestone
 

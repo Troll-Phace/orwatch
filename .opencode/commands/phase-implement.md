@@ -11,7 +11,7 @@ agent: orchestrator
 2. For each task in dependency order:
    - Dispatch the six-field delegation prompt to the assigned subagent via the Task tool.
    - Read the subagent's report against the acceptance criteria **you** set, not against its own summary.
-   - Verify independently: run `uv run pytest` yourself; check `git diff --stat` for files outside the declared scope.
+   - Verify independently: run the tests yourself; check `git diff --stat` for files outside the declared scope.
    - If it falls short, re-delegate with specific feedback naming what failed and why. Do not fix it yourself.
    - After two failed attempts with clear feedback, escalate to `specialist`.
 3. Tasks touching disjoint files may be dispatched together.

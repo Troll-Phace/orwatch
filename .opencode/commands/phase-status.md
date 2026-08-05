@@ -21,7 +21,7 @@ agent: orchestrator
 !`git status --short 2>/dev/null`
 
 ## Deferred markers in source
-!`rg -n "TODO|FIXME|HACK|XXX" --stats -g '!.venv' -g '!__pycache__' -g '!snapshots' 2>/dev/null | tail -12`
+!`rg -n "TODO|FIXME|HACK|XXX" --stats -g '!node_modules' -g '!target' -g '!dist' 2>/dev/null | tail -12`
 
 ## Tool-call failures logged this project
 !`wc -l .opencode/state/tool-errors.jsonl 2>/dev/null || echo "0 (telemetry plugin has recorded nothing)"`

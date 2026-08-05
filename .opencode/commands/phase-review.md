@@ -15,7 +15,7 @@ Files touched since the last tag or 20 commits back:
 ## Do this
 
 1. Read every file listed above in full — not only the diff hunks. A correct hunk inside a wrong function is still a finding.
-2. Run `uv run pytest` yourself. Report the actual output. Also run `uv run ruff check .`.
+2. Run the full test suite yourself. Report the actual output.
 3. Verify each success criterion in `docs/INSTRUCTIONS.md` for this phase **by executing something**, not by reading and agreeing.
 4. Apply the eight-point review checklist from your agent definition.
 5. Report in your standard format, ending with a `VERDICT` and a `TO LOG` list.

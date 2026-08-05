@@ -10,7 +10,12 @@
 
 import type { Plugin } from "@opencode-ai/plugin"
 
-/** Paths no agent may read or write, regardless of permissions. */
+/**
+ * Paths no agent may read or write, regardless of permissions.
+ *
+ * These are matched against a FILE PATH argument, so loose substring patterns
+ * like /secret/ are fine here — `config/secrets.json` should match.
+ */
 const PROTECTED = [
   /(^|[\/\\])\.env($|\.)/i,
   /secret/i,
@@ -24,6 +29,32 @@ const PROTECTED = [
   /(^|[\/\\])\.netrc$/i,
   /opencode\.local\.json$/i,
 ]
+
+/**
+ * A bash command is a sentence, not a path. Running PROTECTED against the raw
+ * command string was a real bug: it blocked
+ *
+ *     gh label create "type:security" -d "Vulnerability, secret exposure, ..."
+ *
+ * because the word "secret" appeared in prose. Worse, the deny message claimed
+ * a "protected path" was involved, which was false — so the agent correctly
+ * inferred a false positive and spent several turns trying to smuggle the word
+ * past the check. A guard that lies about why it fired teaches agents to evade
+ * it.
+ *
+ * So for bash we only test tokens that actually look like filesystem paths:
+ * something containing a slash, or a dotfile/extension-bearing basename.
+ * `cat .env`, `cp ~/.aws/credentials .` and `rg -f secrets.json` still match;
+ * the word "secret" inside a quoted sentence does not.
+ */
+function pathLikeTokens(cmd: string): string[] {
+  // Strip quoted spans first — prose lives in quotes, paths usually do not.
+  const unquoted = cmd.replace(/'[^']*'/g, " ").replace(/"[^"]*"/g, " ")
+  return unquoted
+    .split(/[\s;|&<>()]+/)
+    .filter(Boolean)
+    .filter((t) => /[\/\\]/.test(t) || /^\.?[\w.-]+\.[\w]+$/.test(t) || /^\.[\w-]+$/.test(t))
+}
 
 /** Paths that may be read but never written (lockfiles etc.). */
 const WRITE_PROTECTED = [
@@ -137,10 +168,17 @@ export const Guard: Plugin = async ({ client }) => {
         // read tool, so the checks above would miss it entirely. It also cannot
         // be closed with OpenCode's bash permission patterns, which match
         // PARSED COMMANDS — a pattern containing a pipe or redirect never
-        // matches. So we scan the raw command string for protected paths.
-        for (const rx of PROTECTED) {
-          if (rx.test(cmd)) {
-            await deny(`Shell command references a protected path: ${cmd}`)
+        // matches. So we scan path-like TOKENS, not the whole command string.
+        for (const token of pathLikeTokens(cmd)) {
+          for (const rx of PROTECTED) {
+            if (rx.test(token)) {
+              await deny(
+                `Shell command touches a protected path: "${token}". ` +
+                  `If this is a false positive, fix the rule in ` +
+                  `.opencode/plugins/guard.ts — do not reword the command to ` +
+                  `slip past it.`,
+              )
+            }
           }
         }
 

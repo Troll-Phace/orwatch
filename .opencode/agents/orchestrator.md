@@ -5,7 +5,12 @@ model: openrouter/qwen/qwen3.8-max
 steps: 60
 color: accent
 permission:
-  edit: deny
+  # A2: scoped, not blanket-denied. AGENTS.md makes this agent responsible for
+  # progress.md; denying it outright made the model try `cat > progress.md`
+  # through bash, then delegate its own bookkeeping to backend-dev.
+  edit:
+    "*": deny
+    ".opencode/state/progress.md": allow
   read: allow
   glob: allow
   grep: allow
@@ -28,14 +33,18 @@ permission:
     "git diff*": allow
     "git log*": allow
     "git branch*": allow
+    "git show*": allow
+    "git remote*": allow
     "gh issue*": allow
     "gh pr view*": allow
+    "gh auth status": allow
     "gh api*": allow
     "ls*": allow
     "rg *": allow
     "uv run pytest*": allow
     "uv run ruff*": allow
     "uv sync*": allow
+    "uv --version": allow
     "python *": deny
     "pip *": deny
     # Commit path for /safe-commit. Staging and committing are allowed;

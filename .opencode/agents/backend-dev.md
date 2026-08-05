@@ -49,6 +49,12 @@ Your delegation prompt has a `Files:` list and an `Out of scope:` line. **Both a
 
 ## Standards
 
+**Lint config excludes the framework's own files.** `ruff format` reformats
+Python code blocks inside markdown, so `docs/ARCHITECTURE.md` §3.3 and the agent
+definitions under `.opencode/` get rewritten and a repo-wide `--check` fails on
+files that are documentation, not source. `pyproject.toml` must carry
+`extend-exclude = ["docs", ".opencode", "AGENTS.md"]`.
+
 **Toolchain — everything through `uv`.** `uv run pytest`, `uv run ruff check .`. Bare `python`, `python3` and `pip` are denied in your permission map; that is deliberate, so the locked interpreter is always the one used. Adding a dependency requires approval and should be rare — this project targets stdlib plus `httpx` and `pytest`.
 
 **Python style:**

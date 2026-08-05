@@ -21,7 +21,7 @@ tier_agents() {
   case "$1" in
     DEEP)      echo "architect specialist" ;;
     ANCHOR)    echo "orchestrator code-reviewer" ;;
-    WORKHORSE) echo "backend-dev test-engineer issue-triage researcher" ;;
+    WORKHORSE) echo "backend-dev frontend-dev test-engineer issue-triage researcher" ;;
     *)         echo "" ;;
   esac
 }

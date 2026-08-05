@@ -61,25 +61,6 @@ The DEEP tier also emits roughly **twice the median output token volume**, so it
 6. **Give the DEEP tier hard boundaries.** Its vendor documents it as *excessively proactive on ambiguous tasks, liable to make decisions on the user's behalf*. Every delegation to it carries an explicit `Out of scope:` line.
 7. **`qwen/qwen3.8-max` has exactly one provider.** An Alibaba outage is a total outage for the ANCHOR tier. If orchestration starts failing with upstream errors, re-tier ANCHOR to `moonshotai/kimi-k3` temporarily.
 
-## Measured Tool-Call Behaviour
-
-From the Phase 1 run on 2026-08-05 (86 tool calls, ANCHOR tier):
-
-**Qwen 3.8 Max emits a trailing empty tool call.** 21 of 86 (24%) resolved to a
-tool named `unknown`. Every one had input `{}` and every one followed a
-*successful* call in the same assistant message — a malformed trailing entry in
-the `tool_calls` array, not a wrong tool choice. Correlates most with
-`todowrite` (4/4) and `read`.
-
-**Impact: none.** The harness recovered 21/21. It costs a wasted dispatch and
-some context. This is not a reason to re-tier — the shape of the failure is
-inert. Hallucinated tool *names* would be a different matter.
-
-**Cost baseline.** A complete phase — plan, four delegations, review gate, one
-logged issue, decisions folded back, commit — cost **$2.06**: 766k input, 17k
-output, 20k reasoning, 1.21M cache reads. If a phase costs several times that,
-something is looping; check the `steps` caps first.
-
 ## Known Harness Incompatibility
 
 OpenCode sends non-standard top-level `mcp` and `system` fields. Strict upstream validators reject these with `Extra inputs are not permitted, field: mcp`, surfaced as a generic **"Upstream request failed."**

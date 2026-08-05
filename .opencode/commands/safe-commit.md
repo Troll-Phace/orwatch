@@ -21,7 +21,7 @@ Branch:
 
 1. Review the status and diff above. If anything unexpected is present, stop and report it.
 2. If the secrets check found anything, **stop**. Do not commit.
-3. If source files changed, confirm `uv run pytest` passed in this session. If it did not, run it.
+3. If source files changed, confirm the test suite passed in this session. If it did not, run it.
 4. Confirm the `code-reviewer` gate has run for this work. If it has not, stop and run it.
 5. Stage files **explicitly by path**. Never `git add .`.
 6. Commit as:
