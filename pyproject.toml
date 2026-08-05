@@ -30,3 +30,4 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["allow_network: test may open real sockets (fixture capture only)"]

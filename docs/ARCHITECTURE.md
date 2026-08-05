@@ -121,8 +121,11 @@ class Snapshot:
         deterministic tests."""
 
 # store.py
-def save_snapshot(snap: Snapshot, root: Path) -> Path      # raises StoreError
+def save_snapshot(snap: Snapshot, root: Path, *, retention: int = 30) -> Path
+    # retention is keyword-only so Phase 5's [store] retention config can
+    # thread through without a signature break.
 def load_latest(slug: str, root: Path) -> Snapshot | None  # None on first run
+# both raise StoreError
 
 # diff.py — pure, no I/O
 def compare(prev: Snapshot | None, curr: Snapshot) -> SnapshotDiff
@@ -173,11 +176,18 @@ Slug sanitisation: `/` → `__`. Timestamps are UTC ISO-8601 with `:` → `-`, b
 
 **Retention:** keep the newest 30 per model, prune on every save. Sort by parsed timestamp from the filename, not by filesystem mtime — mtime lies after a copy, a restore, or a git checkout.
 
+**Filename and ordering details:**
+
+- **(a) Whole-second timestamps.** The filename derives from `fetched_at` truncated to whole seconds (`%Y-%m-%dT%H-%M-%SZ`). The full-precision timestamp persists only in the JSON body, and `load_latest` reconstructs it from the body — never from the filename, which is second-precision.
+- **(b) Same-second collisions.** `save_snapshot` appends `-1`, `-2`, ... before `.json` until it finds a free name, never overwriting. The ordering key used everywhere (selection and pruning) is `(timestamp parsed from filename, collision counter)` — never lexicographic filename order, because `'-' < '.'` would put a suffixed name before its bare sibling and invert the sequence.
+- **(c) Unrecognised names.** Files whose names do not match the recognised pattern — including regex-valid but calendar-invalid dates such as month 13 — are ignored for selection and never deleted by pruning.
+- **(d) Load failures.** Every failure while loading is wrapped into `StoreError` carrying the offending path, chained from the original via `raise ... from exc`. The wrapped exception types are `OSError`, `JSONDecodeError`, `RecursionError`, `UnicodeDecodeError`, `KeyError`, `TypeError`, and `ValueError`.
+
 **Edge cases:**
 
 - Directory does not exist on first run → create it, do not raise.
 - A corrupt or truncated JSON file → raise `StoreError` naming the path. Do not skip it silently; a snapshot that won't load is a real problem and hiding it means the next diff is against the wrong baseline.
-- Two snapshots in the same second → the filename collides. Second write must not silently clobber the first; append a disambiguator or refuse.
+- Two snapshots in the same second → the filename collides. The resolution is a `-1`, `-2`, ... disambiguator suffix on the second write; the first file is never clobbered.
 - Clock skew producing a "latest" older than an existing file → sort handles it, but do not assume the newest write is the newest timestamp.
 
 ### 4.3 Diff semantics
@@ -261,6 +271,10 @@ Snapshot file:
 ```
 
 `schema_version` is present from day one. When the record shape changes, `load_latest` on an older version raises `StoreError` with a clear message rather than mis-parsing. Prices persist as strings to survive the `Decimal` round-trip exactly. `supported_parameters` persists sorted so files are diffable in git.
+
+**Schema-version validation.** The loader accepts exactly the integer `1`. Missing keys, wrong types (including JSON `true` and `1.0`, which compare equal to `1` in Python), and any other value raise `StoreError` naming the version and the path.
+
+**Serialisation.** Files are written with `json.dumps(obj, indent=2, sort_keys=True)` plus a trailing newline, so byte-identical inputs yield byte-identical files. The key order in the example above is illustrative only — `sort_keys=True` is normative, and it is what makes the files byte-deterministic.
 
 Config file, `orwatch.toml`:
 

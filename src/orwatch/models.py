@@ -68,6 +68,17 @@ class Snapshot:
             raise ValueError(f"fetched_at must be tz-aware (got naive: {self.fetched_at!r})")
         object.__setattr__(self, "endpoints", tuple(sorted(self.endpoints, key=lambda e: e.tag)))
 
+        # Backstop: tag is the stable identity (ARCHITECTURE §4.1), so two
+        # endpoints sharing a tag would make match-by-tag ambiguous. from_api
+        # checks this pre-construction (and fires first on that path); this
+        # __post_init__ check covers every other construction path, including
+        # direct construction and store loads (ARCHITECTURE §4.2).
+        seen: set[str] = set()
+        for ep in self.endpoints:
+            if ep.tag in seen:
+                raise ValueError(f"duplicate endpoint tag {ep.tag!r} in snapshot")
+            seen.add(ep.tag)
+
     @classmethod
     def from_api(
         cls,

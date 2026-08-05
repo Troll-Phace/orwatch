@@ -7,6 +7,7 @@ match the realistic example record shape from ARCHITECTURE §5 and every field
 is overridable by keyword.
 """
 
+import socket
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -58,3 +59,34 @@ def make_snapshot():
         )
 
     return _make
+
+
+# --- Offline-suite network guard -------------------------------------------------
+# Makes "the suite is offline" a mechanical fact rather than a convention. Any
+# outbound connection from a test raises, unless the test is explicitly marked
+# with @pytest.mark.allow_network (fixture capture only).
+
+
+class NetworkAccessDenied(RuntimeError):
+    """A test attempted a real outbound connection."""
+
+
+@pytest.fixture(autouse=True)
+def _block_network(request, monkeypatch):
+    """Block real sockets for every test that is not marked allow_network."""
+    if request.node.get_closest_marker("allow_network"):
+        return
+
+    def _denied(*args, **kwargs):
+        raise NetworkAccessDenied(
+            f"{request.node.nodeid} attempted a real network connection. "
+            "Use httpx.MockTransport, or mark the test @pytest.mark.allow_network "
+            "if it is a deliberate one-off capture."
+        )
+
+    # connect/connect_ex cover TCP; create_connection covers the helper path
+    # httpx and requests actually use. getaddrinfo is left alone so that DNS
+    # names in mocked requests still resolve to a shape the client accepts.
+    monkeypatch.setattr(socket.socket, "connect", _denied, raising=False)
+    monkeypatch.setattr(socket.socket, "connect_ex", _denied, raising=False)
+    monkeypatch.setattr(socket, "create_connection", _denied, raising=False)
