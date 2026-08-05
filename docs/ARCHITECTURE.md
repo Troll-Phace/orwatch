@@ -117,6 +117,8 @@ def compare(prev: Snapshot | None, curr: Snapshot) -> SnapshotDiff
 
 `Decimal` for prices, not `float`. Prices arrive as decimal strings and get compared for equality; binary floating point turns "unchanged" into "changed by 1e-19".
 
+`Snapshot` enforces its invariants at construction (`__post_init__`): `fetched_at` must be tz-aware — a naive `datetime` raises `ValueError` — and `endpoints` is stored sorted ascending by `tag`, defaulting to an empty tuple. Because the dataclass sorts on construction, the sorted-by-tag invariant is structural rather than an obligation on callers, and any `Snapshot` built by any path is already deterministic to diff. Every error derives from `OrwatchError` (`errors.py`), with subclasses `FetchError` (`client.py`), `StoreError` (`store.py`) and `ConfigError` (`config.py`).
+
 ---
 
 ## 4. Domain Deep-Dives
