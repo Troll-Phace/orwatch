@@ -26,11 +26,10 @@ permission:
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-    "npm *": allow
-    "cargo *": allow
-    "python *": allow
-    "pytest*": allow
-    "make *": allow
+    "uv run*": allow
+    "uv sync*": allow
+    "python *": deny
+    "pip *": deny
     "git push*": deny
     "git commit*": deny
     "sudo *": deny

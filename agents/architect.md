@@ -20,6 +20,10 @@ permission:
   external_directory: ask
   bash:
     "*": deny
+    "uv run*": allow
+    "uv sync*": allow
+    "python *": deny
+    "pip *": deny
     "git log*": allow
     "git diff*": allow
     "git status*": allow

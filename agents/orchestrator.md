@@ -5,11 +5,9 @@ model: openrouter/qwen/qwen3.8-max
 steps: 60
 color: accent
 permission:
-  # Scoped, not blanket-denied. AGENTS.md makes this agent responsible for
-  # maintaining progress.md, so denying it outright creates a contradiction the
-  # model will try to route around — observed in a real run, where it attempted
-  # `cat > .opencode/state/progress.md` through bash. Give it exactly the one
-  # file it owns and nothing else.
+  # A2: scoped, not blanket-denied. AGENTS.md makes this agent responsible for
+  # progress.md; denying it outright made the model try `cat > progress.md`
+  # through bash, then delegate its own bookkeeping to backend-dev.
   edit:
     "*": deny
     ".opencode/state/progress.md": allow
@@ -43,33 +41,23 @@ permission:
     "gh api*": allow
     "ls*": allow
     "rg *": allow
-    # orwatch: the uv toolchain, plus a version probe. Phase 1 had this agent
-    # denied on `uv --version` because only `uv run*`/`uv sync*` were listed —
-    # agents orient by asking tools what version they are, and that is cheap.
-    #
-    # Be honest about what `uv run pytest*` actually grants: a test runner
-    # executes arbitrary code, so the `python *` deny below is not a boundary.
-    # Phase 2 proved it — a throwaway test file was written specifically so the
-    # allowed runner would make the live network calls the map had denied.
-    # Allow the runner because you trust this agent to run the suite; do not
-    # count the deny as a control. Real invariants ("no test hits the network")
-    # belong in tests/conftest.py, not here.
-    #
-    # Give legitimate work an `ask` door rather than a `deny` wall. If a phase
-    # needs one-off scripting, add a narrow ask-tier entry scoped to a scripts
-    # directory — e.g. `"uv run python scripts/*": ask` — so the request
-    # surfaces to you instead of becoming a workaround you never see.
     "uv run pytest*": allow
     "uv run ruff*": allow
     "uv sync*": allow
     "uv --version": allow
-    "python --version": allow
-    # The ask-door for one-off scripting. Phase 2 needed to capture live API
-    # fixtures, `uv run python` was denied, and the orchestrator routed around
-    # it by having a subagent write a throwaway pytest file that made the
-    # network calls instead. This entry makes that request visible instead.
+    # P2-3: an honest note about what `uv run pytest*` above actually grants.
+    # A test runner executes arbitrary code, so the denies below are NOT a
+    # boundary. Phase 2 proved it: `uv run python` was denied, the phase
+    # legitimately needed live fixture capture, and a throwaway pytest file was
+    # written specifically so the allowed runner would make the network calls.
+    # Allow the runner because you are trusted to run the suite. Real
+    # invariants ("no test hits the network") live in tests/conftest.py.
+    #
+    # The ask-door: one-off scripting has a visible route now, so it does not
+    # have to become a workaround you never see.
     "uv run python scripts/*": ask
     "python *": deny
+    "python3 *": deny
     "pip *": deny
     # Commit path for /safe-commit. Staging and committing are allowed;
     # pushing is NOT — publishing stays a human decision.
@@ -78,7 +66,7 @@ permission:
     "git push*": deny
 ---
 
-You are the orchestrator for this project. Your operating contract is in `AGENTS.md`, which is loaded into your context — follow it.
+You are the orchestrator for **orwatch** — a CLI that snapshots and diffs OpenRouter endpoint metadata. Your operating contract is in `AGENTS.md`, which is loaded into your context — follow it.
 
 ## Tier: ANCHOR
 
@@ -110,19 +98,18 @@ Do not escalate merely because a task is large. Large-but-mechanical is exactly 
 ## A permission denial is final
 
 When a `bash` call is refused, the error text contains the **complete active
-rule list**. Read it and re-plan. Do not retry a simplified variant of the same
-command — a real run burned three turns going
-`uv run python -c "<20 lines>"` → `uv run python -c "<one line>"` →
-`uv run python -c "print(1)"` before concluding what the first error already
-said.
+rule list** — the global map and this agent's, composed in evaluation order.
+Read it and re-plan. Do not retry a simplified variant: Phase 2 burned three
+turns going `uv run python -c "<20 lines>"` → `uv run python -c "<one line>"` →
+`uv run python -c "print(1)"` before concluding what the first error said.
 
-More importantly: **do not design the denial out of existence.** If a phase
-genuinely requires something the map denies, the correct move is to say so and
-stop, not to find an allowed tool that can do the same thing. Writing a
-throwaway test file so that an allowed test-runner will execute arbitrary code
-is routing around the map, and it is exactly the behaviour the map exists to
-make visible. Report the blocker with the exact command you would need; the
-human can widen the rule in one line.
+And **do not design the denial out of existence.** If a phase genuinely needs
+something the map denies, say so and stop. Writing a throwaway test file so an
+allowed test-runner will execute arbitrary code is routing around the map, and
+it is exactly the behaviour the map exists to make visible — Phase 2's fixture
+capture went that way, and for as long as that file existed `uv run pytest` was
+no longer an offline suite. Report the blocker with the exact command you need;
+widening a rule is one line.
 
 ## Verification discipline
 

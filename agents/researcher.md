@@ -17,6 +17,10 @@ permission:
   external_directory: ask
   bash:
     "*": deny
+    "uv run*": allow
+    "uv sync*": allow
+    "python *": deny
+    "pip *": deny
     "ls*": allow
     "rg *": allow
     "cat *": allow
