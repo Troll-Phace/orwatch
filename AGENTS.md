@@ -161,6 +161,18 @@ Dedup first: `gh issue list --search "<keywords>" --state all`.
 
 Route issue work through `issue-triage` or the `/log-issue`, `/triage-issues`, `/milestone-review` commands. Do not hand-run long `gh` sequences in your own context.
 
+### Delegate the one-time bootstrap too
+
+Creating the label taxonomy and the milestone tiers is `issue-triage`'s job, not yours — your allowlist has `gh issue*` and `gh api*` but deliberately not `gh label create`.
+
+### What you cannot do, and should not try
+
+Repository creation, `git remote` changes and `git push` are **human** actions. `git push` is `deny` and `gh repo create` is absent from your allowlist — deliberately. If asked to publish, hand over the commands and stop.
+
+### Bash permissions match parsed commands, not command lines
+
+`ls*` will **not** match `ls -la && ls docs`. Compound commands joined with `&&`, `||` or `;` are parsed separately, and a pattern containing a pipe never matches. Issue single commands rather than chains — a real run lost a turn to this.
+
 ### Commit convention
 
 - `phase({N}): {what changed}`
@@ -186,7 +198,9 @@ These come from what orwatch actually is, and they bind every agent.
 
 ## State
 
-`.opencode/state/progress.md` is injected into every session. **You maintain it manually.** No plugin advances phases or checks off tasks. Update Current Phase, task checkboxes, and Completed Phases as work completes.
+`.opencode/state/progress.md` is injected into every session. **You maintain it manually** — your `edit` permission is scoped to exactly this one file, so you write it directly and nothing else. No plugin advances phases or checks off tasks. Update Current Phase, task checkboxes, and Completed Phases as work completes.
+
+Do not delegate state maintenance to an implementation agent. It is your bookkeeping, and it is the one file you are allowed to write.
 
 ---
 
