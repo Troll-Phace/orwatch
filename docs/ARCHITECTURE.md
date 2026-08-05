@@ -82,8 +82,15 @@ First run has no previous snapshot. `load_latest` returns `None`, `compare` trea
 
 ```python
 # client.py
-def fetch_endpoints(slug: str, *, timeout: float = 20.0) -> dict:
-    """Raises FetchError on network failure, non-200, or unparseable JSON."""
+def fetch_endpoints(
+    slug: str,
+    *,
+    timeout: float = 20.0,
+    transport: httpx.BaseTransport | None = None,
+) -> dict:
+    """Raises FetchError on network failure, non-200, or unparseable JSON.
+    transport is the test-injection seam (None = default transport); tests
+    pass httpx.MockTransport and never construct a client themselves."""
 
 # models.py
 @dataclass(frozen=True, slots=True)
@@ -106,6 +113,12 @@ class Snapshot:
     model_slug: str
     fetched_at: datetime          # UTC, tz-aware
     endpoints: tuple[EndpointRecord, ...]   # sorted by tag
+
+    @classmethod
+    def from_api(cls, slug: str, payload: object, *,
+                 fetched_at: datetime | None = None) -> Snapshot:
+        """fetched_at defaults to datetime.now(UTC); injectable for
+        deterministic tests."""
 
 # store.py
 def save_snapshot(snap: Snapshot, root: Path) -> Path      # raises StoreError
@@ -138,6 +151,10 @@ The API returns `data.endpoints[]`, each with `name`, `tag`, `provider_name`, `c
 - `pricing` values are strings like `"0.000003"`. Parse with `Decimal(str)`, never `float()`.
 - A model slug that does not exist returns HTTP 200 with an empty `endpoints` array — **not** a 404. Empty-but-valid is a legitimate response and it is what every `:free` variant returns. Distinguish it from a fetch failure.
 - The whole `data` object can be missing on an error response. Do not assume it is present.
+- A 200 response whose `data` or `endpoints` key is missing or null is empty-but-valid and normalises to a zero-endpoint snapshot; present but wrong-typed structure raises `ValueError` naming the field. (models.py is stdlib-only per §3.1, so malformed payloads raise `ValueError`, not `FetchError` — callers mapping to exit codes must catch it.)
+- Price strings must parse as finite `Decimal`s; "NaN"/"Infinity" are rejected.
+- Duplicate `tag` values within one response are rejected — tag is the identity and duplicates would make match-by-tag ambiguous.
+- The live response carries more fields than listed above (latency and uptime metrics, `model_id`, extra pricing keys like `input_cache_read`, etc.). They are dropped deliberately, like any unknown field.
 
 ### 4.2 Snapshot store
 
