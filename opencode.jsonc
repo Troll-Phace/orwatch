@@ -1,0 +1,214 @@
+{
+  // ===================================================================
+  // orwatch — OpenRouter endpoint watcher
+  // Agentic Framework 2.1-OC
+  //
+  // Provider allowlists below were derived from a LIVE preflight run on
+  // 2026-08-05, not from memory. Re-derive before trusting them:
+  //     bash .opencode/scripts/preflight.sh
+  // ===================================================================
+
+  "$schema": "https://opencode.ai/config.json",
+
+  // -------------------------------------------------------------------
+  // TIER MAP — the single place model choice lives.
+  //   DEEP      = openrouter/moonshotai/kimi-k3               $3.00 / $15.00
+  //   ANCHOR    = openrouter/qwen/qwen3.8-max                 $2.00 /  $6.00
+  //   WORKHORSE = openrouter/deepseek/deepseek-v4-flash-0731  $0.09 /  $0.18
+  //   TRIVIAL   = openrouter/deepseek/deepseek-v4-flash-0731
+  //
+  // Agents bind their tier in .opencode/agents/*.md frontmatter.
+  // Swap one:  bash .opencode/scripts/retier.sh WORKHORSE <provider/slug>
+  // -------------------------------------------------------------------
+
+  "model": "openrouter/qwen/qwen3.8-max",
+  "small_model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "default_agent": "orchestrator",
+
+  // Subagents cannot spawn subagents. This is the default, set explicitly
+  // because recursive delegation is expensive and hard to observe.
+  "subagent_depth": 1,
+
+  "provider": {
+    "openrouter": {
+      "options": {
+        // Reasoning models on long agentic turns need generous timeouts.
+        "timeout": 900000,
+        "chunkTimeout": 120000,
+        // Stable cache key so prompt caching survives turn-to-turn prefix churn.
+        "setCacheKey": true
+      },
+
+      "models": {
+        // ============ DEEP — architect, specialist ============
+        // Live probe: 12 endpoints, 9 tool-capable.
+        //   NO TOOLS AT ALL : modal/mxfp4, chutes/mxfp4, fireworks/fast
+        //   no structured_outputs : digitalocean, baseten/fp8
+        //
+        // Only two tags are safe to list, and the reason is prefix matching:
+        // provider slugs in `order` match by prefix, so a bare tag pulls in
+        // its /fast sibling too.
+        //   "fireworks" -> also fireworks/fast, which has NO tools
+        //   "morph"     -> also morph/fast    at $6.00/$22.50 (vs $2.90/$14.00)
+        //   "wafer"     -> also wafer/fast    at $4.50/$22.50 (vs $3.00/$15.00)
+        // moonshotai/mxfp4 and together have no such sibling. Both are
+        // $3.00/$15.00 with structured outputs, first-party first.
+        //
+        // Do NOT set temperature here — K3 fixes temperature=1.0 / top_p=0.95
+        // and ignores overrides.
+        "moonshotai/kimi-k3": {
+          "options": {
+            "provider": {
+              "require_parameters": true,
+              "allow_fallbacks": false,
+              "order": ["moonshotai/mxfp4", "together"]
+            },
+            "reasoning": { "effort": "high" }
+          },
+          "variants": {
+            // K3 accepts exactly low | high | max. There is no "medium".
+            "deep": { "reasoning": { "effort": "max" } },
+            "cheap": { "reasoning": { "effort": "low" } }
+          }
+        },
+
+        // ============ ANCHOR — orchestrator, code-reviewer ============
+        // Exactly ONE endpoint exists (alibaba). There is no failover: an
+        // Alibaba outage is a total outage for this tier. Recovery is
+        //     bash .opencode/scripts/retier.sh ANCHOR openrouter/moonshotai/kimi-k3
+        //
+        // Reasoning is MANDATORY on this model and defaults to "xhigh", the
+        // most expensive setting. On an orchestrator taking dozens of turns
+        // that is the single largest silent cost in this file, so it is
+        // pinned to "medium" and escalation is an explicit variant.
+        "qwen/qwen3.8-max": {
+          "options": {
+            "provider": {
+              "require_parameters": true,
+              "allow_fallbacks": false,
+              "order": ["alibaba"]
+            },
+            "reasoning": { "effort": "medium" }
+          },
+          "variants": {
+            "deep": { "reasoning": { "effort": "high" } },
+            "cheap": { "reasoning": { "effort": "low" } }
+          }
+        },
+
+        // ============ WORKHORSE — backend-dev, test-engineer, etc. ============
+        // NOTE THE -0731 SUFFIX. The bare slug `deepseek/deepseek-v4-flash`
+        // is the OLDER April build: benchmarks lower AND costs more
+        // ($0.14/$0.28 vs $0.09/$0.18).
+        //
+        // Live probe: 19 endpoints, all tool-capable. Excluded for missing
+        // structured_outputs: gmicloud/fp8, novita/fp8, deepseek/fp8.
+        //
+        // deepinfra/fp4 is 35% cheaper than the rest but caps output at
+        // 65,536 tokens. Fine for ordinary edits; use the "longform" variant
+        // when generating something large.
+        //
+        // Effort granularity is illusory here: low and medium both map to
+        // high internally, xhigh maps to max. Only two real levels exist.
+        "deepseek/deepseek-v4-flash-0731": {
+          "options": {
+            "provider": {
+              "require_parameters": true,
+              "allow_fallbacks": false,
+              "order": [
+                "deepinfra/fp4",
+                "together",
+                "cloudflare/fp8",
+                "parasail/fp8",
+                "atlas-cloud/fp8"
+              ]
+            },
+            "reasoning": { "effort": "high" }
+          },
+          "variants": {
+            "deep": { "reasoning": { "effort": "max" } },
+            // Routes only to endpoints with 384K+ max output.
+            "longform": {
+              "provider": {
+                "require_parameters": true,
+                "allow_fallbacks": false,
+                "order": ["parasail/fp8", "ambient/fp4", "cloudflare/fp8"]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  // -------------------------------------------------------------------
+  // Deterministic context injection. OpenCode has NO path-scoped rules —
+  // everything here loads every session, concatenated with AGENTS.md.
+  // Keep this list short.
+  // -------------------------------------------------------------------
+  "instructions": [".opencode/state/progress.md", "docs/MODEL_PROFILES.md"],
+
+  // -------------------------------------------------------------------
+  // Global permission floor. Rules are LAST-MATCH-WINS, so "*" goes first
+  // and specific rules after. Agents override this per-agent.
+  // -------------------------------------------------------------------
+  "permission": {
+    "edit": "ask",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "external_directory": "ask",
+    "bash": {
+      "*": "ask",
+      "ls*": "allow",
+      "cat *": "allow",
+      "rg *": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "gh issue*": "allow",
+      "gh label*": "allow",
+      "gh api*": "allow",
+      "gh pr view*": "allow",
+      "uv run*": "allow",
+      "uv sync*": "allow",
+      "uv lock*": "allow",
+      "uv add*": "ask",
+      "uv remove*": "ask",
+      // Force everything through uv so the locked interpreter is used.
+      "python *": "deny",
+      "python3 *": "deny",
+      "pip *": "deny",
+      "pip3 *": "deny",
+      "sudo *": "deny",
+      "rm -rf /*": "deny",
+      "chmod 777*": "deny"
+      // NOTE: pipe-to-shell (`curl x | sh`) is NOT expressible here — bash
+      // permissions match parsed commands, so a pattern containing a pipe
+      // never matches. That case is caught by .opencode/plugins/guard.ts.
+    }
+  },
+
+  // -------------------------------------------------------------------
+  // Compaction, sized for reasoning models.
+  // prune MUST stay false: Kimi K3 runs in preserved-thinking-history mode
+  // and degrades in solve rate when reasoning history is dropped.
+  // -------------------------------------------------------------------
+  "compaction": { "auto": true, "prune": false, "reserved": 32000 },
+
+  "formatter": true,
+  "lsp": true,
+  "share": "disabled",
+  "autoupdate": "notify",
+
+  "watcher": {
+    "ignore": [
+      ".venv/**",
+      "__pycache__/**",
+      ".pytest_cache/**",
+      ".ruff_cache/**",
+      "snapshots/**",
+      ".git/**",
+      ".opencode/state/**"
+    ]
+  }
+}

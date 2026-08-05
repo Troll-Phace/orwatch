@@ -1,0 +1,12 @@
+# --- Agentic Framework 2.1-OC ---
+.opencode/state/
+opencode.local.json
+.opencode/node_modules/
+
+# --- orwatch ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+snapshots/
