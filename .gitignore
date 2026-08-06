@@ -1,6 +1,10 @@
 .DS_Store
 # --- Agentic Framework 2.1-OC ---
-.opencode/state/
+# NOT the state/ directory — progress.md is phase state and must be committed,
+# and ignoring the dir also makes `git add .opencode/state/progress.md` fail.
+.opencode/state/tool-errors.jsonl
+.opencode/state/sessions.jsonl
+.opencode/state/events-seen.jsonl
 opencode.local.json
 .opencode/node_modules/
 
